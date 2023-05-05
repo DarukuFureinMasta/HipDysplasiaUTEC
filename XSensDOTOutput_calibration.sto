@@ -1,6 +1,7 @@
-Coordinates
-nRows=614
-nColumns=4
+DataRate=60.0
+DataType=Quaternion
+Version=3
+OpenSimVersion=4.1
 endheader
 time	humerus_r_imu	torso_imu	radius_r_imu
 0.0	0.07468001,0.4534563,-0.23906955,0.8553643	0.8713088,-0.0693046,-0.44641486,-0.19165917	0.7609283,0.59616387,0.18642561,0.17556277
