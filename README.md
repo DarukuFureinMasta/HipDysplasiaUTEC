@@ -12,4 +12,4 @@ in quaternions in real time. Data is also recorded in a CSV file.\
 **"csv2sto.py":** Formats outputted CSV files into STO files so data can be read by OpenSim. Folder contains CSV example files.
                
 ### XSensVR/XSensPythonVR/:
-**"MoBuXSens.py":** Streams quaternions in real time into Motion Builder.
+**"MoBuXSens.py":** Streams quaternions in real time to Motion Builder.
