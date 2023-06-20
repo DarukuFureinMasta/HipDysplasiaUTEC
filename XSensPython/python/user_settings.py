@@ -32,5 +32,5 @@ import getpass
 whitelist = list()
 dot_basename = "xsens"
 username = getpass.getuser().lower()
-whitelist = {}
+whitelist = {'D4:22:CD:00:57:64','D4:22:CD:00:57:52'}
 dot_basename = "Xsens DOT"

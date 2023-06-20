@@ -30,7 +30,6 @@
 # Requires installation of the correct Xsens DOT PC SDK wheel through pip
 # For example, for Python 3.9 on Windows 64 bit run the following command
 # pip install xsensdot_pc_sdk-202x.x.x-cp39-none-win_amd64.whl
-
 import time
 from pynput import keyboard
 from threading import Lock
@@ -99,7 +98,7 @@ def on_press(key):
     waitForConnections = False
 
 # Sensor Connection Trial and Retrial
-def ConnectionAttempts():
+def ConnectionAttempts(manager, address, portInfo):
     # Number of connection retrials
     retry_number=7
     for attempt in range(retry_number):
@@ -113,7 +112,37 @@ def ConnectionAttempts():
             continue
     return 1
 
-if __name__ == "__main__":
+
+def run_sensors_script(manager, callback, deviceList):
+    startTime = xsensdot_pc_sdk.XsTimeStamp_nowMs()
+    while xsensdot_pc_sdk.XsTimeStamp_nowMs() - startTime <= 100000:
+        if callback.packetsAvailable():
+            quaternion_data = []
+            for device in deviceList:
+                packet = callback.getNextPacket(device.portInfo().bluetoothAddress())
+
+                if packet.containsOrientation():
+                    quaternion = packet.orientationQuaternion()
+                    quaternion_data.append(f"{device.deviceTagName()}: QW:{quaternion[0]:7.2f}, QY:{quaternion[1]:7.2f}, QX:{quaternion[2]:7.2f}, QY:{quaternion[3]:7.2f}")
+
+            if quaternion_data:
+                print("  ".join(quaternion_data))
+
+def stop_sensors_script(manager, deviceList):
+    print("\nStopping measurement...")
+    for device in deviceList:
+        if not device.stopMeasurement():
+            print("Failed to stop measurement.")
+        if not device.disableLogging():
+            print("Failed to disable logging.")
+
+    print("Closing ports...")
+    manager.close()
+
+    print("Successful exit.")
+
+
+def main():
     # Print SDK version
     version = xsensdot_pc_sdk.XsVersion()
     xsensdot_pc_sdk.xsdotsdkDllVersion(version)
@@ -157,13 +186,12 @@ if __name__ == "__main__":
         exit(-1)
 
     # Set the device tag name of a device
-
     deviceList = list()
     sequence_number = 0
     for portInfo in callback.getDetectedDots():
         address = portInfo.bluetoothAddress()
         while True:
-            if ConnectionAttempts() == 1:
+            if ConnectionAttempts(manager, address, portInfo) == 1:
                 user_input = input("Do you want to continue trying (1), follow along (2) or abort (3)?")
                 if user_input == "1":
                     print("Retrying")
@@ -178,7 +206,6 @@ if __name__ == "__main__":
                     exit(-1)
             else:
                 break
-
 
         device = manager.device(portInfo.deviceId())
         if device is None:
@@ -199,75 +226,19 @@ if __name__ == "__main__":
             print("Setting filter profile failed!");
 
     for device in deviceList:
-        print("Setting quaternion CSV output")
-        device.setLogOptions(xsensdot_pc_sdk.XsLogOptions_Quaternion)
-
         logFileName = "logfile_" + device.portInfo().bluetoothAddress().replace(':', '-') + ".csv"
-        print(f"Enable logging to: {logFileName}")
         if not device.enableLogging(logFileName):
-            print(f"Failed to enable logging. Reason: {manager.lastResultText()}")
+            print(f"Failed to enable logging to: {logFileName}")
 
-        print("Putting device into Quaternion measurement mode.")
         if not device.startMeasurement(xsensdot_pc_sdk.XsPayloadMode_ExtendedQuaternion):
             print(f"Could not put device into measurement mode. Reason: {manager.lastResultText()}")
             continue
 
-    print("\nMain loop. Recording data for 10 seconds.")
-    print("-----------------------------------------")
 
-    # First printing some headers so we see which data belongs to which device
-    s = ""
-    for device in deviceList:
-        s += f"{device.portInfo().bluetoothAddress():42}"
-    print("%s" % s, flush=True)
+    run_sensors_script(manager, callback, deviceList)
 
-    orientationResetDone = False
-    startTime = xsensdot_pc_sdk.XsTimeStamp_nowMs()
-    while xsensdot_pc_sdk.XsTimeStamp_nowMs() - startTime <= 100000:
-        if callback.packetsAvailable():
-            s = ""
-            quaternion_data=[]
-            for device in deviceList:
-                # Retrieve a packet
-                packet = callback.getNextPacket(device.portInfo().bluetoothAddress())
+    stop_sensors_script(manager, deviceList)
 
-                if packet.containsOrientation():
-                    quaternion = packet.orientationQuaternion()
-                    quaternion_data.append(f"{device.deviceTagName()}: QW:{quaternion[0]:7.2f}, QY:{quaternion[1]:7.2f}, QX:{quaternion[2]:7.2f}, QY:{quaternion[3]:7.2f}")
 
-            if quaternion_data:
-                print("  ".join(quaternion_data))
-
-            print("%s\r" % s, end="", flush=True)
-
-            if not orientationResetDone and xsensdot_pc_sdk.XsTimeStamp_nowMs() - startTime > 5000:
-                for device in deviceList:
-                    print(f"\nResetting heading for device {device.portInfo().bluetoothAddress()}: ", end="", flush=True)
-                    if device.resetOrientation(xsensdot_pc_sdk.XRM_Heading):
-                        print("OK", end="", flush=True)
-                    else:
-                        print(f"NOK: {device.lastResultText()}", end="", flush=True)
-                print("\n", end="", flush=True)
-                orientationResetDone = True
-    print("\n-----------------------------------------", end="", flush=True)
-
-    for device in deviceList:
-        print(f"\nResetting heading to default for device {device.portInfo().bluetoothAddress()}: ", end="", flush=True)
-        if device.resetOrientation(xsensdot_pc_sdk.XRM_DefaultAlignment):
-            print("OK", end="", flush=True)
-        else:
-            print(f"NOK: {device.lastResultText()}", end="", flush=True)
-    print("\n", end="", flush=True)
-
-    print("\nStopping measurement...")
-    for device in deviceList:
-        if not device.stopMeasurement():
-            print("Failed to stop measurement.")
-        if not device.disableLogging():
-            print("Failed to disable logging.")
-
-    print("Closing ports...")
-    manager.close()
-
-    print("Successful exit.")
-
+if __name__ == "__main__":
+    main()
